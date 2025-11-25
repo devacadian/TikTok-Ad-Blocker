@@ -1,4 +1,4 @@
-// content.js
+// contentScript.js (updated to support Sponsored + Live toggles)
 (() => {
   const VIDEO_SELECTORS = [
     '[data-e2e*="feed-video"]',
@@ -8,6 +8,17 @@
   ].join(",");
 
   const SPONSORED_WORDS = ["sponsored", "promoted"];
+  const LIVE_WORDS = [" live", "live now"];
+
+  const DEFAULT_SETTINGS = {
+    sponsoredEnabled: true,
+    liveEnabled: false
+  };
+
+  const settings = {
+    sponsoredEnabled: DEFAULT_SETTINGS.sponsoredEnabled,
+    liveEnabled: DEFAULT_SETTINGS.liveEnabled
+  };
 
   const log = (...args) =>
     console.log(
@@ -18,7 +29,6 @@
 
   const isEl = (n) => n && n.nodeType === Node.ELEMENT_NODE;
 
-  // find all cards in DOM order
   const getCards = () => Array.from(document.querySelectorAll(VIDEO_SELECTORS));
 
   const goToNextCard = (currentCard) => {
@@ -27,53 +37,80 @@
 
     if (idx === -1) {
       log("Could not find current card index, falling back to window scroll.");
-      window.scrollBy({ top: window.innerHeight * 0.9, left: 0, behavior: "smooth" });
+      window.scrollBy({
+        top: window.innerHeight * 0.9,
+        left: 0,
+        behavior: "smooth"
+      });
       return;
     }
 
     const next = cards[idx + 1] || cards[idx - 1];
     if (!next) {
       log("No next/previous card found, falling back to window scroll.");
-      window.scrollBy({ top: window.innerHeight * 0.9, left: 0, behavior: "smooth" });
+      window.scrollBy({
+        top: window.innerHeight * 0.9,
+        left: 0,
+        behavior: "smooth"
+      });
       return;
     }
 
-    log("→ Scrolling to next video card.", { fromIndex: idx, toIndex: cards.indexOf(next) });
+    log("→ Scrolling to next video card.", {
+      fromIndex: idx,
+      toIndex: cards.indexOf(next)
+    });
 
-    // important: use scrollIntoView so we beat TikTok snapping
     next.scrollIntoView({
       behavior: "smooth",
       block: "center"
     });
   };
 
-  const isSponsoredCard = (card) => {
-    const text = (card.innerText || card.textContent || "")
-      .trim()
-      .toLowerCase();
+  const getCardText = (card) =>
+    (card.innerText || card.textContent || "").trim().toLowerCase();
 
+  const isSponsoredCard = (card) => {
+    const text = getCardText(card);
     if (!text) return false;
     return SPONSORED_WORDS.some((w) => text.includes(w));
+  };
+
+  const isLiveCard = (card) => {
+    // heuristic: text + any live-related data-e2e
+    const text = getCardText(card);
+    if (!text) return false;
+
+    if (card.querySelector('[data-e2e*="live"]')) return true;
+    return LIVE_WORDS.some((w) => text.includes(w));
   };
 
   const inspectCard = (card) => {
     if (!isEl(card)) return;
     if (card.dataset.skipChecked === "1") return;
 
-    const sponsored = isSponsoredCard(card);
+    const sponsored = settings.sponsoredEnabled && isSponsoredCard(card);
+    const live = settings.liveEnabled && isLiveCard(card);
+
     card.dataset.skipChecked = "1";
 
-    if (sponsored) {
-      card.dataset.skipSponsored = "1";
+    if (sponsored || live) {
+      card.dataset.skipBlocked = "1";
+      const reason = sponsored && live
+        ? "SPONSORED + LIVE"
+        : sponsored
+        ? "SPONSORED"
+        : "LIVE";
+
       log(
-        "%cVideo status: SPONSORED → skipping",
+        `%cVideo status: ${reason} → skipping`,
         "font-weight:bold;color:red",
         card
       );
       setTimeout(() => goToNextCard(card), 80);
     } else {
       log(
-        "%cVideo status: Not sponsored",
+        "%cVideo status: Allowed (not sponsored/live or feature disabled)",
         "font-weight:bold;color:green",
         card
       );
@@ -86,8 +123,8 @@
     log("Attached observer to", cards.length, "existing video cards.");
   };
 
-  const init = () => {
-    log("Initializing…");
+  const setupObservers = () => {
+    log("Initializing observers…");
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -128,7 +165,6 @@
 
     mo.observe(document.body, { childList: true, subtree: true });
 
-    // periodic safety net
     setInterval(() => {
       const cards = document.querySelectorAll(VIDEO_SELECTORS);
       cards.forEach((card) => {
@@ -144,12 +180,64 @@
     log("Extension active ✔");
   };
 
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
-    init();
-  } else {
-    window.addEventListener("DOMContentLoaded", init, { once: true });
+  const loadSettings = (cb) => {
+    if (!chrome?.storage?.sync) {
+      log("chrome.storage.sync not available, using defaults.");
+      cb();
+      return;
+    }
+
+    chrome.storage.sync.get(DEFAULT_SETTINGS, (res) => {
+      settings.sponsoredEnabled = !!res.sponsoredEnabled;
+      settings.liveEnabled = !!res.liveEnabled;
+
+      log("Loaded settings:", {
+        sponsoredEnabled: settings.sponsoredEnabled,
+        liveEnabled: settings.liveEnabled
+      });
+
+      cb();
+    });
+  };
+
+  // react live to popup changes
+  if (chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "sync") return;
+
+      if (changes.sponsoredEnabled) {
+        settings.sponsoredEnabled = !!changes.sponsoredEnabled.newValue;
+        log("Sponsored toggle changed:", settings.sponsoredEnabled);
+        // allow re-checking if needed
+        document
+          .querySelectorAll(`[data-skip-checked="1"]`)
+          .forEach((el) => delete el.dataset.skipChecked);
+      }
+
+      if (changes.liveEnabled) {
+        settings.liveEnabled = !!changes.liveEnabled.newValue;
+        log("Live toggle changed:", settings.liveEnabled);
+        document
+          .querySelectorAll(`[data-skip-checked="1"]`)
+          .forEach((el) => delete el.dataset.skipChecked);
+      }
+    });
   }
+
+  const boot = () => {
+    loadSettings(() => {
+      if (
+        document.readyState === "complete" ||
+        document.readyState === "interactive"
+      ) {
+        setupObservers();
+      } else {
+        window.addEventListener("DOMContentLoaded", setupObservers, {
+          once: true
+        });
+      }
+    });
+  };
+
+  boot();
 })();
