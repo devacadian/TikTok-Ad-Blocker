@@ -1,28 +1,29 @@
-// contentScript.js 
+// contentScript.js
 (() => {
-try {
-  const path = window.location.pathname || "";
+  try {
+    const path = window.location.pathname || "";
 
-  const BLOCKED_PATHS = [
-    "/live",
-    "/friends",
-    "/following",
-    "/explore",
-    "/tiktokstudio"
-  ];
+    const BLOCKED_PATHS = [
+      "/live",
+      "/friends",
+      "/following",
+      "/explore",
+      "/tiktokstudio"
+    ];
 
-  // match exact + subpaths (e.g. /live/abc)
-  if (BLOCKED_PATHS.some(base => path === base || path.startsWith(base + "/"))) {
-    console.log(
-      "%c[TikTok-Skipper]",
-      "color:#00c4ff;font-weight:bold",
-      "Disabled on", path
-    );
+    // match exact + subpaths (e.g. /live/abc)
+    if (BLOCKED_PATHS.some((base) => path === base || path.startsWith(base + "/"))) {
+      console.log(
+        "%c[TikTok-Skipper]",
+        "color:#00c4ff;font-weight:bold",
+        "Disabled on",
+        path
+      );
+      return;
+    }
+  } catch {
     return;
   }
-} catch {
-  return;
-}
 
   const VIDEO_SELECTORS = [
     '[data-e2e*="feed-video"]',
@@ -54,6 +55,44 @@ try {
   const isEl = (n) => n && n.nodeType === Node.ELEMENT_NODE;
 
   const getCards = () => Array.from(document.querySelectorAll(VIDEO_SELECTORS));
+
+  // state for repeated skipping loop
+  const skipState = {
+    active: false,
+    card: null,
+    intervalId: null
+  };
+
+  const stopSkipLoop = (reason) => {
+    if (!skipState.active) return;
+    try {
+      clearInterval(skipState.intervalId);
+    } catch {}
+    log("Stopping skip loop:", reason);
+    skipState.active = false;
+    skipState.card = null;
+    skipState.intervalId = null;
+  };
+
+  const getCenteredCard = () => {
+    const cards = getCards();
+    if (!cards.length) return null;
+    const midY = window.innerHeight / 2;
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+      const center = rect.top + rect.height / 2;
+      const dist = Math.abs(center - midY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = card;
+      }
+    }
+    return best;
+  };
 
   const goToNextCard = (currentCard) => {
     const cards = getCards();
@@ -89,6 +128,44 @@ try {
       behavior: "smooth",
       block: "center"
     });
+  };
+
+  // keep trying to skip every 500ms until a new centered card appears
+  const startSkipLoop = (card) => {
+    if (!isEl(card)) return;
+
+    if (skipState.active && skipState.card === card) {
+      // already skipping this card
+      return;
+    }
+
+    if (skipState.active && skipState.card !== card) {
+      stopSkipLoop("starting new loop for different card");
+    }
+
+    skipState.active = true;
+    skipState.card = card;
+
+    log("Starting skip loop for blocked card.", card);
+
+    skipState.intervalId = setInterval(() => {
+      const centered = getCenteredCard();
+
+      // if some other card is now centered, stop skipping
+      if (centered && centered !== skipState.card) {
+        stopSkipLoop("new card centered");
+        return;
+      }
+
+      // if original card disappeared from DOM, stop
+      if (!document.body.contains(skipState.card)) {
+        stopSkipLoop("blocked card removed from DOM");
+        return;
+      }
+
+      // still the same blocked card, try skipping again
+      goToNextCard(skipState.card);
+    }, 500);
   };
 
   const getCardText = (card) =>
@@ -131,7 +208,9 @@ try {
         "font-weight:bold;color:red",
         card
       );
-      setTimeout(() => goToNextCard(card), 80);
+
+      // start repeated skip attempts until a new card is centered
+      startSkipLoop(card);
     } else {
       log(
         "%cVideo status: Allowed (not sponsored/live or feature disabled)",
@@ -228,9 +307,11 @@ try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
 
+      // when toggles change, stop any active skip loop and allow re-checks
       if (changes.sponsoredEnabled) {
         settings.sponsoredEnabled = !!changes.sponsoredEnabled.newValue;
         log("Sponsored toggle changed:", settings.sponsoredEnabled);
+        stopSkipLoop("settings changed (sponsored)");
         document
           .querySelectorAll('[data-skip-checked="1"]')
           .forEach((el) => delete el.dataset.skipChecked);
@@ -239,6 +320,7 @@ try {
       if (changes.liveEnabled) {
         settings.liveEnabled = !!changes.liveEnabled.newValue;
         log("Live toggle changed:", settings.liveEnabled);
+        stopSkipLoop("settings changed (live)");
         document
           .querySelectorAll('[data-skip-checked="1"]')
           .forEach((el) => delete el.dataset.skipChecked);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TikTok Ad Block",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Auto-scrolls past sponsored and live posts on TikTok web.",
   "icons": {
     "16": "icon.png",
