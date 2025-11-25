@@ -3,15 +3,28 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>TikTok Skipper</title>
+    <title>TikTok Ad Blocker</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <div class="popup">
-      <h1>TikTok Skipper</h1>
+      <header class="popup-header">
+        <div class="logo-pill">
+          <span class="logo-dot"></span>
+        </div>
+        <div class="header-text">
+          <h1>TikTok Ad Blocker</h1>
+          <p>Auto-skip sponsored & live posts</p>
+        </div>
+      </header>
+
+      <div class="divider"></div>
 
       <label class="row">
-        <span>Sponsored Post</span>
+        <div class="row-text">
+          <span class="row-title">Sponsored Post</span>
+          <span class="row-subtitle">Skip ads in your feed</span>
+        </div>
         <label class="switch">
           <input type="checkbox" id="sponsoredToggle" />
           <span class="slider"></span>
@@ -19,13 +32,17 @@
       </label>
 
       <label class="row">
-        <span>Live Post</span>
+        <div class="row-text">
+          <span class="row-title">Live Post</span>
+          <span class="row-subtitle">Skip live streams</span>
+        </div>
         <label class="switch">
           <input type="checkbox" id="liveToggle" />
           <span class="slider"></span>
         </label>
       </label>
     </div>
+
     <script src="popup.js"></script>
   </body>
 </html>

@@ -1,34 +1,139 @@
 /* popup.css */
+:root {
+  --accent: #00c4ff;
+  --accent-soft: rgba(0, 196, 255, 0.18);
+  --bg: #050816;
+  --card-bg: rgba(14, 23, 42, 0.92);
+  --text-main: #f9fafb;
+  --text-muted: #9ca3af;
+  --border-subtle: rgba(148, 163, 184, 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
+  padding: 10px;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  background: radial-gradient(circle at top left, #111827, #020617 60%);
+  color: var(--text-main);
 }
 
 .popup {
-  padding: 10px 12px;
-  min-width: 220px;
+  min-width: 260px;
+  max-width: 280px;
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--border-subtle);
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(14px);
 }
 
-h1 {
-  font-size: 14px;
-  margin: 0 0 8px;
+/* header */
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
 }
+
+.logo-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 20% 20%, #ec4899, #0ea5e9 65%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.7);
+}
+
+.logo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #020617;
+  box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.85);
+}
+
+.header-text h1 {
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.header-text p {
+  font-size: 11px;
+  margin: 2px 0 0;
+  color: var(--text-muted);
+}
+
+/* divider */
+
+.divider {
+  height: 1px;
+  margin: 6px 0 4px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.7),
+    transparent
+  );
+}
+
+/* rows */
 
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 6px 0;
+  padding: 6px 4px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.1s ease;
+}
+
+.row:hover {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.row:active {
+  transform: translateY(1px);
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-title {
   font-size: 13px;
 }
 
+.row-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* toggle switch */
+
 .switch {
   position: relative;
   display: inline-block;
-  width: 40px;
-  height: 20px;
+  width: 42px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .switch input {
@@ -39,11 +144,14 @@ h1 {
 
 .slider {
   position: absolute;
-  cursor: pointer;
   inset: 0;
-  background-color: #ccc;
-  transition: 0.2s;
+  background: rgba(15, 23, 42, 0.95);
   border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
 }
 
 .slider::before {
@@ -52,16 +160,23 @@ h1 {
   height: 16px;
   width: 16px;
   left: 2px;
-  bottom: 2px;
-  background-color: #fff;
-  transition: 0.2s;
-  border-radius: 50%;
+  top: 2px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  transition: transform 0.18s ease, background 0.18s ease,
+    box-shadow 0.18s ease;
+  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.7);
 }
 
 input:checked + .slider {
-  background-color: #00c4ff;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6);
 }
 
 input:checked + .slider::before {
-  transform: translateX(20px);
+  transform: translateX(18px);
+  background: #f9fafb;
+  box-shadow: 0 0 0 1px rgba(8, 145, 178, 0.7),
+    0 6px 10px rgba(8, 47, 73, 0.8);
 }
