@@ -1,5 +1,29 @@
-// contentScript.js (updated to support Sponsored + Live toggles)
+// contentScript.js 
 (() => {
+try {
+  const path = window.location.pathname || "";
+
+  const BLOCKED_PATHS = [
+    "/live",
+    "/friends",
+    "/following",
+    "/explore",
+    "/tiktokstudio"
+  ];
+
+  // match exact + subpaths (e.g. /live/abc)
+  if (BLOCKED_PATHS.some(base => path === base || path.startsWith(base + "/"))) {
+    console.log(
+      "%c[TikTok-Skipper]",
+      "color:#00c4ff;font-weight:bold",
+      "Disabled on", path
+    );
+    return;
+  }
+} catch {
+  return;
+}
+
   const VIDEO_SELECTORS = [
     '[data-e2e*="feed-video"]',
     '[data-e2e*="browse-video"]',
@@ -77,7 +101,6 @@
   };
 
   const isLiveCard = (card) => {
-    // heuristic: text + any live-related data-e2e
     const text = getCardText(card);
     if (!text) return false;
 
@@ -96,11 +119,12 @@
 
     if (sponsored || live) {
       card.dataset.skipBlocked = "1";
-      const reason = sponsored && live
-        ? "SPONSORED + LIVE"
-        : sponsored
-        ? "SPONSORED"
-        : "LIVE";
+      const reason =
+        sponsored && live
+          ? "SPONSORED + LIVE"
+          : sponsored
+          ? "SPONSORED"
+          : "LIVE";
 
       log(
         `%cVideo status: ${reason} → skipping`,
@@ -200,7 +224,6 @@
     });
   };
 
-  // react live to popup changes
   if (chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
@@ -208,9 +231,8 @@
       if (changes.sponsoredEnabled) {
         settings.sponsoredEnabled = !!changes.sponsoredEnabled.newValue;
         log("Sponsored toggle changed:", settings.sponsoredEnabled);
-        // allow re-checking if needed
         document
-          .querySelectorAll(`[data-skip-checked="1"]`)
+          .querySelectorAll('[data-skip-checked="1"]')
           .forEach((el) => delete el.dataset.skipChecked);
       }
 
@@ -218,7 +240,7 @@
         settings.liveEnabled = !!changes.liveEnabled.newValue;
         log("Live toggle changed:", settings.liveEnabled);
         document
-          .querySelectorAll(`[data-skip-checked="1"]`)
+          .querySelectorAll('[data-skip-checked="1"]')
           .forEach((el) => delete el.dataset.skipChecked);
       }
     });
